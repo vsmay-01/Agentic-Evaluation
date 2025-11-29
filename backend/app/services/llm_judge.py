@@ -1,0 +1,106 @@
+"""
+LLM-based evaluation for agent responses.
+Evaluates: hallucination prevention, assumption prevention, response accuracy.
+Supports real LLM (GPT-4, Claude) or heuristic fallback.
+"""
+
+from ..core.config import settings
+from .llm_provider import get_llm_provider
+from typing import Dict, Any
+
+
+def judge_with_llm(prompt: str, response: str) -> Dict[str, Any]:
+    """
+    Evaluate agent response using real LLM or heuristics.
+    
+    Evaluates:
+    - Hallucination detection (facts not grounded in prompt)
+    - Assumption prevention (unnecessary or risky assumptions)
+    - Response accuracy (how well it answers the prompt)
+    
+    Falls back to heuristics if LLM API fails.
+    
+    Returns:
+        dict with 'score' (0-1), 'reason' string, and 'dimension_scores'
+    """
+    if not settings.use_llm_evaluation:
+        return judge_with_heuristics(prompt, response)
+    
+    try:
+        provider = get_llm_provider(
+            settings.llm_provider,
+            openai_api_key=settings.openai_api_key,
+            openai_model=settings.openai_model,
+            claude_api_key=settings.claude_api_key,
+            claude_model=settings.claude_model
+        )
+        result = provider.evaluate_response(prompt, response)
+        return result
+        
+    except Exception as e:
+        if settings.use_heuristic_fallback:
+            print(f"LLM evaluation failed: {str(e)}. Falling back to heuristics.")
+            return judge_with_heuristics(prompt, response)
+        else:
+            raise
+
+
+def judge_with_heuristics(prompt: str, response: str) -> Dict[str, Any]:
+    """
+    Fallback: Use heuristics when LLM API is unavailable.
+    
+    Heuristic-based evaluation on:
+    - Hallucination detection (phrases that indicate speculation)
+    - Assumption prevention (uncertain language)
+    - Response accuracy (response detail/confidence level)
+    """
+    score = 0.8  # default good score
+    reasons = []
+    
+    dimension_scores = {
+        "instruction_following": 0.8,
+        "hallucination_prevention": 0.8,
+        "assumption_prevention": 0.8,
+        "coherence": 0.8,
+        "accuracy": 0.8
+    }
+    
+    # Heuristic 1: Hallucination detection
+    hallucination_phrases = ["i think", "probably", "maybe", "i guess", "it seems", "could be"]
+    hallucination_count = sum(1 for phrase in hallucination_phrases if phrase in response.lower())
+    if hallucination_count > 2:
+        score -= 0.15
+        dimension_scores["hallucination_prevention"] -= 0.2
+        reasons.append(f"Detected {hallucination_count} speculative phrases (possible hallucination)")
+    
+    # Heuristic 2: Assumption prevention
+    assumption_phrases = ["assuming", "if we assume", "without knowing", "unclear if"]
+    assumption_count = sum(1 for phrase in assumption_phrases if phrase in response.lower())
+    if assumption_count > 1:
+        score -= 0.1
+        dimension_scores["assumption_prevention"] -= 0.15
+        reasons.append(f"Detected {assumption_count} assumptions")
+    
+    # Heuristic 3: Response consistency with prompt
+    if len(response.strip()) < 50:
+        score -= 0.1
+        dimension_scores["accuracy"] -= 0.15
+        reasons.append("Response is brief; may lack detail")
+    
+    # Heuristic 4: Confidence language
+    hedge_words = ["somewhat", "slightly", "relatively", "quite", "rather"]
+    hedge_count = sum(1 for word in hedge_words if word in response.lower())
+    if hedge_count > 1:
+        score -= 0.05
+        dimension_scores["coherence"] -= 0.1
+        reasons.append(f"Detected {hedge_count} hedging words (lower confidence)")
+    
+    # Normalize scores
+    for key in dimension_scores:
+        dimension_scores[key] = max(0.0, min(1.0, dimension_scores[key]))
+    
+    return {
+        "score": max(0.0, min(1.0, score)),
+        "reason": "; ".join(reasons) if reasons else "Response meets evaluation criteria (heuristic evaluation)",
+        "dimension_scores": dimension_scores
+    }

@@ -1,0 +1,21 @@
+{
+  "name": "agentic-evaluation-react",
+  "version": "0.1.0",
+  "private": true,
+  "proxy": "http://localhost:8000",
+  "browserslist": [
+    "last 2 versions",
+    "not dead",
+    ">0.2%"
+  ],
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-scripts": "^5.0.1"
+  }
+}

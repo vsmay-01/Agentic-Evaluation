@@ -1,0 +1,9 @@
+[
+  {
+    "id": "example-1",
+    "model_name": "gpt-example",
+    "inputs": [
+      {"prompt": "Summarize the following text...", "reference": "Reference summary here"}
+    ]
+  }
+]
