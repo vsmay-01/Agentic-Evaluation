@@ -1,171 +1,198 @@
 """
-LLM Provider abstraction for multi-LLM support.
-Supports OpenAI GPT-4, Claude, and heuristic fallback.
+LLM Provider abstraction (Gemini-only / Vertex AI)
+
+This module provides a compact provider that uses Google Vertex AI
+generative models (Gemini) to produce evaluation scores. It returns
+a dictionary with an overall `score`, `reason`, and `dimension_scores`.
 """
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any
-import os
+import json
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class LLMProvider(ABC):
     """Abstract base for LLM providers."""
-    
+
     @abstractmethod
     def evaluate_response(self, prompt: str, response: str) -> Dict[str, Any]:
+        """Evaluate agent response using LLM.
+
+        Returns a dict with keys: `score` (0-1), `reason` (str),
+        and `dimension_scores` (dict).
         """
-        Evaluate agent response using LLM.
-        
-        Returns:
-            dict with 'score' (0-1) and 'reason' string
-        """
-        pass
 
 
-class OpenAIProvider(LLMProvider):
-    """OpenAI GPT-4 evaluation."""
-    
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY not set")
-        self.api_key = api_key
+class GeminiProvider(LLMProvider):
+    """Google Vertex AI (Gemini) provider.
+
+    This implementation uses `google.cloud.aiplatform` when available.
+    It attempts to initialize the Vertex AI client only on demand so
+    the module can be imported even if the dependency is not installed.
+    """
+
+    def __init__(self, project_id: str, location: str = "us-central1", model: str = "gemini-1.5-flash"):
+        if not project_id:
+            raise ValueError("GCP project id must be provided")
+        self.project_id = project_id
+        self.location = location
         self.model = model
-        
+
     def evaluate_response(self, prompt: str, response: str) -> Dict[str, Any]:
-        """Use GPT-4 to evaluate response on multiple dimensions."""
-        try:
-            from openai import OpenAI
-            client = OpenAI(api_key=self.api_key)
-            
-            evaluation_prompt = f"""
-You are an expert evaluator of agent responses. Evaluate this response on:
-1. Instruction Following (0-1): Does it follow the prompt exactly?
-2. Hallucination Prevention (0-1): Are facts accurate or made-up?
-3. Assumption Prevention (0-1): Are unnecessary assumptions avoided?
-4. Response Coherence (0-1): Is it logically structured?
-5. Response Accuracy (0-1): Does it answer correctly?
+        evaluation_prompt = f"""
+You are an expert evaluator of agent responses. Evaluate this response on the following five dimensions and return ONLY valid JSON with numeric scores between 0.0 and 1.0:
+
+1. instruction_following: Does the response follow the prompt exactly?
+2. hallucination_prevention: Are facts accurate or made-up?
+3. assumption_prevention: Are unnecessary assumptions avoided?
+4. coherence: Is it logically structured?
+5. accuracy: Does it answer correctly?
 
 Prompt: {prompt}
 
 Response: {response}
 
-Respond in JSON format:
-{{"instruction_following": 0.X, "hallucination_prevention": 0.X, "assumption_prevention": 0.X, "coherence": 0.X, "accuracy": 0.X, "reason": "brief explanation"}}
+Return JSON with keys: instruction_following, hallucination_prevention, assumption_prevention, coherence, accuracy, reason
 """
-            
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": evaluation_prompt}],
-                temperature=0.3,
-                max_tokens=200
-            )
-            
-            import json
-            result_text = response.choices[0].message.content
-            result = json.loads(result_text)
-            
-            # Calculate average score
-            scores = [
-                result.get("instruction_following", 0.5),
-                result.get("hallucination_prevention", 0.5),
-                result.get("assumption_prevention", 0.5),
-                result.get("coherence", 0.5),
-                result.get("accuracy", 0.5)
-            ]
-            avg_score = sum(scores) / len(scores)
-            
-            return {
-                "score": avg_score,
-                "reason": result.get("reason", "Evaluated by GPT-4"),
-                "dimension_scores": {
-                    "instruction_following": result.get("instruction_following", 0.5),
-                    "hallucination_prevention": result.get("hallucination_prevention", 0.5),
-                    "assumption_prevention": result.get("assumption_prevention", 0.5),
-                    "coherence": result.get("coherence", 0.5),
-                    "accuracy": result.get("accuracy", 0.5)
-                }
-            }
-        except Exception as e:
-            raise RuntimeError(f"OpenAI evaluation failed: {str(e)}")
 
-
-class ClaudeProvider(LLMProvider):
-    """Anthropic Claude evaluation."""
-    
-    def __init__(self, api_key: str, model: str = "claude-3-5-sonnet-20241022"):
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY not set")
-        self.api_key = api_key
-        self.model = model
-        
-    def evaluate_response(self, prompt: str, response: str) -> Dict[str, Any]:
-        """Use Claude to evaluate response on multiple dimensions."""
+        # Lazy import to avoid hard dependency at import time
         try:
-            from anthropic import Anthropic
-            client = Anthropic(api_key=self.api_key)
-            
-            evaluation_prompt = f"""
-You are an expert evaluator of agent responses. Evaluate this response on:
-1. Instruction Following (0-1): Does it follow the prompt exactly?
-2. Hallucination Prevention (0-1): Are facts accurate or made-up?
-3. Assumption Prevention (0-1): Are unnecessary assumptions avoided?
-4. Response Coherence (0-1): Is it logically structured?
-5. Response Accuracy (0-1): Does it answer correctly?
-
-Prompt: {prompt}
-
-Response: {response}
-
-Respond in JSON format:
-{{"instruction_following": 0.X, "hallucination_prevention": 0.X, "assumption_prevention": 0.X, "coherence": 0.X, "accuracy": 0.X, "reason": "brief explanation"}}
-"""
-            
-            result = client.messages.create(
-                model=self.model,
-                max_tokens=200,
-                messages=[{"role": "user", "content": evaluation_prompt}]
-            )
-            
-            import json
-            result_text = result.content[0].text
-            parsed = json.loads(result_text)
-            
-            # Calculate average score
-            scores = [
-                parsed.get("instruction_following", 0.5),
-                parsed.get("hallucination_prevention", 0.5),
-                parsed.get("assumption_prevention", 0.5),
-                parsed.get("coherence", 0.5),
-                parsed.get("accuracy", 0.5)
-            ]
-            avg_score = sum(scores) / len(scores)
-            
+            from google.cloud import aiplatform
+        except Exception as e:  # pragma: no cover - external dependency
+            logger.exception("google-cloud-aiplatform is not installed or failed to import")
             return {
-                "score": avg_score,
-                "reason": parsed.get("reason", "Evaluated by Claude"),
+                "score": 0.5,
+                "reason": f"Vertex AI client unavailable: {str(e)}",
                 "dimension_scores": {
-                    "instruction_following": parsed.get("instruction_following", 0.5),
-                    "hallucination_prevention": parsed.get("hallucination_prevention", 0.5),
-                    "assumption_prevention": parsed.get("assumption_prevention", 0.5),
-                    "coherence": parsed.get("coherence", 0.5),
-                    "accuracy": parsed.get("accuracy", 0.5)
-                }
+                    "instruction_following": 0.5,
+                    "hallucination_prevention": 0.5,
+                    "assumption_prevention": 0.5,
+                    "coherence": 0.5,
+                    "accuracy": 0.5,
+                },
             }
+
+        try:
+            # Initialize Vertex AI (no-op if already configured)
+            aiplatform.init(project=self.project_id, location=self.location)
+
+            # High-level interface: GenerativeModel / TextGenerationModel depending on SDK
+            # Try recommended high-level API if available
+            model_obj = None
+            if hasattr(aiplatform, "GenerativeModel"):
+                model_obj = aiplatform.GenerativeModel(self.model)
+                response_obj = model_obj.generate(evaluation_prompt) if hasattr(model_obj, "generate") else model_obj.generate_content(evaluation_prompt)
+            elif hasattr(aiplatform, "TextGenerationModel"):
+                model_obj = aiplatform.TextGenerationModel.from_pretrained(self.model)
+                response_obj = model_obj.generate(evaluation_prompt)
+            else:
+                # Fallback to the generic Model class (older SDKs)
+                model_obj = aiplatform.Model(self.model)
+                # Use `predict` or `batch_predict` if available; attempt a gentle call
+                if hasattr(model_obj, "predict"):
+                    response_obj = model_obj.predict(evaluation_prompt)
+                else:
+                    # As last resort, attempt to call the gapic PredictionServiceClient
+                    from google.cloud.aiplatform.gapic import PredictionServiceClient
+                    client = PredictionServiceClient()
+                    endpoint = model_obj.resource_name if hasattr(model_obj, "resource_name") else f"projects/{self.project_id}/locations/{self.location}/models/{self.model}"
+                    response_obj = client.predict(endpoint=endpoint, instances=[{"content": evaluation_prompt}])
+
+            # Extract text from response object in a robust way
+            response_text = None
+            if isinstance(response_obj, dict) and "text" in response_obj:
+                response_text = response_obj["text"]
+            elif hasattr(response_obj, "text"):
+                response_text = getattr(response_obj, "text")
+            elif hasattr(response_obj, "generations"):
+                # Some SDKs return generations -> list -> text
+                gens = getattr(response_obj, "generations")
+                if gens and isinstance(gens, list) and hasattr(gens[0], "text"):
+                    response_text = gens[0].text
+                elif isinstance(gens, list) and isinstance(gens[0], dict) and "text" in gens[0]:
+                    response_text = gens[0]["text"]
+            else:
+                response_text = str(response_obj)
+
+            # Clean up common markdown wrappers
+            if response_text is None:
+                raise ValueError("Empty response from Gemini model")
+
+            if "```json" in response_text:
+                response_text = response_text.split("```json", 1)[1].split("```", 1)[0].strip()
+            elif response_text.strip().startswith("```"):
+                # remove triple-backticks
+                parts = response_text.split("```")
+                if len(parts) >= 2:
+                    response_text = parts[1].strip()
+
+            # Attempt to parse JSON
+            try:
+                result = json.loads(response_text)
+            except Exception:
+                # If response is not strict JSON, attempt to extract JSON substring
+                import re
+
+                m = re.search(r"\{[\s\S]*\}", response_text)
+                if m:
+                    result = json.loads(m.group(0))
+                else:
+                    raise
+
+            # Normalize and compute overall score
+            dims = [
+                float(result.get("instruction_following", 0.5)),
+                float(result.get("hallucination_prevention", 0.5)),
+                float(result.get("assumption_prevention", 0.5)),
+                float(result.get("coherence", 0.5)),
+                float(result.get("accuracy", 0.5)),
+            ]
+            overall = sum(dims) / len(dims)
+
+            return {
+                "score": max(0.0, min(1.0, overall)),
+                "reason": result.get("reason", "Evaluated by Gemini"),
+                "dimension_scores": {
+                    "instruction_following": dims[0],
+                    "hallucination_prevention": dims[1],
+                    "assumption_prevention": dims[2],
+                    "coherence": dims[3],
+                    "accuracy": dims[4],
+                },
+            }
+
         except Exception as e:
-            raise RuntimeError(f"Claude evaluation failed: {str(e)}")
+            logger.exception("Gemini evaluation failed")
+            return {
+                "score": 0.5,
+                "reason": f"Gemini evaluation error: {str(e)}",
+                "dimension_scores": {
+                    "instruction_following": 0.5,
+                    "hallucination_prevention": 0.5,
+                    "assumption_prevention": 0.5,
+                    "coherence": 0.5,
+                    "accuracy": 0.5,
+                },
+            }
 
 
-def get_llm_provider(provider_name: str, **kwargs) -> LLMProvider:
-    """Factory function to get the appropriate LLM provider."""
-    if provider_name == "openai":
-        return OpenAIProvider(
-            api_key=kwargs.get("openai_api_key"),
-            model=kwargs.get("openai_model", "gpt-4o-mini")
-        )
-    elif provider_name == "claude":
-        return ClaudeProvider(
-            api_key=kwargs.get("claude_api_key"),
-            model=kwargs.get("claude_model", "claude-3-5-sonnet-20241022")
-        )
-    else:
-        raise ValueError(f"Unknown LLM provider: {provider_name}")
+def get_llm_provider(provider_name: str = "gemini", **kwargs) -> LLMProvider:
+    """Factory function to get LLM provider instance.
+
+    For this repository we default to `gemini`. Extra kwargs:
+    - project_id
+    - location
+    - model
+    """
+    if provider_name != "gemini":
+        raise ValueError("Only 'gemini' provider is supported in this build")
+
+    return GeminiProvider(
+        project_id=kwargs.get("project_id") or kwargs.get("gcp_project"),
+        location=kwargs.get("location") or kwargs.get("gcp_location"),
+        model=kwargs.get("model") or kwargs.get("gemini_model"),
+    )

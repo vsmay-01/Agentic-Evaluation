@@ -1,3 +1,11 @@
+try:
+    # Ensure .env is loaded before other imports so settings pick up values
+    from dotenv import load_dotenv, find_dotenv
+    load_dotenv(find_dotenv())
+except Exception:
+    # If python-dotenv is not installed, proceed; environment vars may be set externally
+    pass
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .api import health, evaluate, batch

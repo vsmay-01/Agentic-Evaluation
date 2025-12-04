@@ -29,10 +29,9 @@ def judge_with_llm(prompt: str, response: str) -> Dict[str, Any]:
     try:
         provider = get_llm_provider(
             settings.llm_provider,
-            openai_api_key=settings.openai_api_key,
-            openai_model=settings.openai_model,
-            claude_api_key=settings.claude_api_key,
-            claude_model=settings.claude_model
+            gcp_project=settings.gcp_project,
+            gcp_location=settings.gcp_location,
+            gemini_model=settings.gemini_model
         )
         result = provider.evaluate_response(prompt, response)
         return result

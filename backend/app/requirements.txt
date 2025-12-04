@@ -4,6 +4,8 @@ pydantic
 pydantic-settings
 sqlalchemy
 pytest
-openai
-anthropic
 python-dotenv
+google-cloud-aiplatform
+
+
+
