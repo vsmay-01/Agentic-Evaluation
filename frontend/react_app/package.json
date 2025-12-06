@@ -16,6 +16,10 @@
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-scripts": "^5.0.1"
+    "react-scripts": "^5.0.1",
+    "react-router-dom": "^6.20.0",
+    "recharts": "^2.10.3",
+    "axios": "^1.6.2",
+    "react-dropzone": "^14.2.3"
   }
 }

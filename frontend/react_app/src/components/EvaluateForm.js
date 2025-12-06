@@ -1,0 +1,188 @@
+import React, { useState } from 'react';
+import { evaluate } from '../utils/api';
+import './EvaluateForm.css';
+
+function EvaluateForm() {
+  const [formData, setFormData] = useState({
+    id: '',
+    model_name: '',
+    prompt: '',
+    reference: '',
+  });
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const payload = {
+        id: formData.id || `eval-${Date.now()}`,
+        model_name: formData.model_name || 'unknown',
+        inputs: [
+          {
+            prompt: formData.prompt,
+            reference: formData.reference || null,
+          },
+        ],
+      };
+
+      const response = await evaluate(payload);
+      setResult(response);
+    } catch (err) {
+      setError(err.message || 'Evaluation failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getScoreColor = (score) => {
+    if (score >= 0.8) return '#10b981';
+    if (score >= 0.6) return '#f59e0b';
+    return '#ef4444';
+  };
+
+  const getScoreLabel = (score) => {
+    if (score >= 0.9) return 'Excellent';
+    if (score >= 0.8) return 'Good';
+    if (score >= 0.6) return 'Fair';
+    return 'Poor';
+  };
+
+  return (
+    <div className="evaluate-container">
+      <div className="evaluate-card">
+        <h2>Single Evaluation</h2>
+        <p className="subtitle">Evaluate a single agent response across 5 dimensions</p>
+
+        <form onSubmit={handleSubmit} className="evaluate-form">
+          <div className="form-group">
+            <label>Evaluation ID (optional)</label>
+            <input
+              type="text"
+              name="id"
+              value={formData.id}
+              onChange={handleChange}
+              placeholder="eval-001"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Model Name</label>
+            <input
+              type="text"
+              name="model_name"
+              value={formData.model_name}
+              onChange={handleChange}
+              placeholder="gpt-4, claude-3, etc."
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Prompt</label>
+            <textarea
+              name="prompt"
+              value={formData.prompt}
+              onChange={handleChange}
+              placeholder="Enter the prompt given to the agent..."
+              rows="4"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Reference Response (optional)</label>
+            <textarea
+              name="reference"
+              value={formData.reference}
+              onChange={handleChange}
+              placeholder="Expected or reference response for comparison..."
+              rows="4"
+            />
+          </div>
+
+          <button type="submit" className="submit-btn" disabled={loading}>
+            {loading ? 'Evaluating...' : 'Evaluate Response'}
+          </button>
+        </form>
+
+        {error && (
+          <div className="error-message">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {result && (
+          <div className="result-card">
+            <h3>Evaluation Results</h3>
+            
+            <div className="score-display">
+              <div 
+                className="score-circle"
+                style={{ 
+                  background: `conic-gradient(${getScoreColor(result.score)} 0deg ${result.score * 360}deg, #e5e7eb ${result.score * 360}deg 360deg)`
+                }}
+              >
+                <div className="score-inner">
+                  <span className="score-value">{(result.score * 100).toFixed(1)}%</span>
+                  <span className="score-label">{getScoreLabel(result.score)}</span>
+                </div>
+              </div>
+            </div>
+
+            {result.details?.dimension_scores && (
+              <div className="dimension-scores">
+                <h4>Dimension Scores</h4>
+                <div className="dimensions-grid">
+                  {Object.entries(result.details.dimension_scores).map(([dim, score]) => (
+                    <div key={dim} className="dimension-item">
+                      <div className="dimension-header">
+                        <span className="dimension-name">
+                          {dim.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                        <span className="dimension-score" style={{ color: getScoreColor(score) }}>
+                          {(score * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="dimension-bar">
+                        <div 
+                          className="dimension-fill"
+                          style={{ 
+                            width: `${score * 100}%`,
+                            backgroundColor: getScoreColor(score)
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {result.details?.evaluation_details && (
+              <div className="evaluation-details">
+                <h4>Details</h4>
+                <pre>{JSON.stringify(result.details.evaluation_details, null, 2)}</pre>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default EvaluateForm;
+

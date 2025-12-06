@@ -6,6 +6,8 @@ sqlalchemy
 pytest
 python-dotenv
 google-cloud-aiplatform
+openai>=1.0.0
+anthropic>=0.18.0
 
 
 

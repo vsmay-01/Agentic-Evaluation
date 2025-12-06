@@ -27,12 +27,26 @@ def judge_with_llm(prompt: str, response: str) -> Dict[str, Any]:
         return judge_with_heuristics(prompt, response)
     
     try:
-        provider = get_llm_provider(
-            settings.llm_provider,
-            gcp_project=settings.gcp_project,
-            gcp_location=settings.gcp_location,
-            gemini_model=settings.gemini_model
-        )
+        # Build kwargs based on provider
+        provider_kwargs = {}
+        if settings.llm_provider == "gemini":
+            provider_kwargs = {
+                "gcp_project": settings.gcp_project,
+                "gcp_location": settings.gcp_location,
+                "gemini_model": settings.gemini_model,
+            }
+        elif settings.llm_provider == "openai":
+            provider_kwargs = {
+                "openai_api_key": settings.openai_api_key,
+                "openai_model": settings.openai_model,
+            }
+        elif settings.llm_provider == "anthropic":
+            provider_kwargs = {
+                "anthropic_api_key": settings.anthropic_api_key,
+                "anthropic_model": settings.anthropic_model,
+            }
+        
+        provider = get_llm_provider(settings.llm_provider, **provider_kwargs)
         result = provider.evaluate_response(prompt, response)
         return result
         

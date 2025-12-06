@@ -50,8 +50,18 @@ def evaluate(req: EvaluationRequest):
                 all_dimension_scores[dim].append(val)
     
     # Aggregate all scores
-    score_list = [v for k, v in scores.items() if isinstance(v, float)]
-    final_score = score_aggregator.aggregate_scores(score_list)
+    from ..core.config import settings
+    
+    if settings.use_weighted_scoring and aggregated_dimensions:
+        # Use weighted aggregation
+        final_score = score_aggregator.aggregate_scores_weighted(
+            aggregated_dimensions,
+            settings.dimension_weights
+        )
+    else:
+        # Use simple average
+        score_list = [v for k, v in scores.items() if isinstance(v, float)]
+        final_score = score_aggregator.aggregate_scores(score_list)
     
     # Calculate average per dimension
     aggregated_dimensions = {}

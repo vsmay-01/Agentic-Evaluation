@@ -49,6 +49,24 @@ class Settings(BaseSettings):
     # Feature flags
     use_llm_evaluation: bool = True
     use_heuristic_fallback: bool = True
+    
+    # Weighted scoring configuration
+    use_weighted_scoring: bool = False
+    dimension_weights: dict = {
+        "instruction_following": 0.2,
+        "hallucination_prevention": 0.25,
+        "assumption_prevention": 0.15,
+        "coherence": 0.15,
+        "accuracy": 0.25,
+    }
+    
+    # OpenAI Configuration (optional)
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4"
+    
+    # Anthropic Configuration (optional)
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-3-opus-20240229"
 
 
 settings = Settings()

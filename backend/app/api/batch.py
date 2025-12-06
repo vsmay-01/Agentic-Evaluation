@@ -109,7 +109,7 @@ async def _process_batch(batch_id: str, req: EvaluationRequest):
         )
         
         # Save batch result
-        save_results.save_result(result)
+        save_results.save_batch_result(batch_id, result)
         
         batch_status[batch_id]["status"] = "completed"
         batch_status[batch_id]["result"] = result

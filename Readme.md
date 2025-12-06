@@ -75,75 +75,126 @@ scripts/
 └── export_scores.py            # Export results
 ```
 
-## Running the System
+## Quick Start
 
-### Backend (FastAPI)
-```powershell
-# From project root, activate venv
-& "venv/Scripts/Activate.ps1"
+### 1. Backend Setup
 
-# Start the backend on port 8000
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+cd backend/app
+pip install -r requirements.txt
+
+# Configure environment (create .env file in project root)
+# See docs/SETUP_GUIDE.md for details
+
+# Start backend
 uvicorn backend.app.main:app --reload --port 8000
 ```
 
-Backend endpoints:
-- `POST /evaluate/` - Submit evaluation requests
-- `GET /health/ready` - Readiness check
-- `GET /health/live` - Liveness check
+### 2. Frontend Setup
 
-### Frontend (React)
-```powershell
-# From project root
+```bash
+# Install dependencies
 cd frontend/react_app
 npm install
+
+# Start frontend
 npm start
 ```
 
-React app runs on http://localhost:3000 with proxy to http://localhost:8000
+### 3. Access the Application
 
-## Example Evaluation Request
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs (Swagger UI)
 
-```json
-{
-  "id": "eval-001",
-  "model_name": "gpt-4",
-  "inputs": [
-    {
-      "prompt": "Summarize the key benefits of machine learning",
-      "reference": "Expected summary or reference answer"
-    }
-  ]
-}
+For detailed setup instructions, see [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)
+
+## Usage Examples
+
+### Single Evaluation (API)
+
+```bash
+curl -X POST http://localhost:8000/evaluate/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "eval-001",
+    "model_name": "gpt-4",
+    "inputs": [{
+      "prompt": "What is machine learning?",
+      "reference": "Machine learning is a subset of AI"
+    }]
+  }'
 ```
 
-## Example Response
+### Batch Processing (Script)
 
-```json
-{
-  "id": "eval-001",
-  "score": 0.85,
-  "details": {
-    "dimension_scores": {
-      "input_0_rule_score": 0.8,
-      "input_0_llm_score": 0.9
-    },
-    "evaluation_details": {
-      "input_0_rule_issues": [],
-      "input_0_llm_reason": "Response meets evaluation criteria"
-    },
-    "model_name": "gpt-4"
-  }
-}
+```bash
+python scripts/batch_runner.py data/sample_inputs/example_batch.json
 ```
 
-## Next Steps
+### Batch Processing (API)
 
-- [ ] Integrate real LLM API (GPT-4, Claude) for better hallucination detection
-- [ ] Add weighted scoring by dimension
-- [ ] Implement batch API for 1000s of responses
-- [ ] Add leaderboard/analytics dashboard
-- [ ] Support custom evaluation rules
-- [ ] Add database backend (PostgreSQL) for persistence
+```bash
+# Submit batch
+curl -X POST http://localhost:8000/api/batch \
+  -H "Content-Type: application/json" \
+  -d @data/sample_inputs/example_batch.json
+
+# Check status
+curl http://localhost:8000/api/batch/status/batch-001
+
+# Get results
+curl http://localhost:8000/api/batch/result/batch-001
+```
+
+See [docs/api_docs.md](docs/api_docs.md) for complete API documentation.
+
+## Features
+
+✅ **Multi-Provider LLM Support**
+- Google Gemini (Vertex AI)
+- OpenAI GPT-4
+- Anthropic Claude
+- Automatic heuristic fallback
+
+✅ **Comprehensive Evaluation**
+- 5-dimensional scoring system
+- Rule-based and LLM-based checks
+- Configurable weighted scoring
+
+✅ **Batch Processing**
+- Async processing for 1000s of responses
+- Progress tracking
+- Status polling API
+
+✅ **Analytics Dashboard**
+- Real-time statistics
+- Interactive charts and visualizations
+- Model comparison leaderboard
+- Score distribution analysis
+- Trend tracking
+
+✅ **Database Integration**
+- SQLite (default, no setup)
+- PostgreSQL support
+- Automatic schema creation
+
+✅ **Modern Frontend**
+- Beautiful, responsive UI
+- Single evaluation form
+- Batch upload with drag & drop
+- Real-time dashboard updates
+
+## Documentation
+
+- [Setup Guide](docs/SETUP_GUIDE.md) - Installation and configuration
+- [API Documentation](docs/api_docs.md) - Complete API reference
+- [Project Report](docs/project_report.md) - Architecture and methodology
 
 ## Folders
 

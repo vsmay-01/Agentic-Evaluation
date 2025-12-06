@@ -183,16 +183,30 @@ Return JSON with keys: instruction_following, hallucination_prevention, assumpti
 def get_llm_provider(provider_name: str = "gemini", **kwargs) -> LLMProvider:
     """Factory function to get LLM provider instance.
 
-    For this repository we default to `gemini`. Extra kwargs:
-    - project_id
-    - location
-    - model
+    Supported providers: gemini, openai, anthropic
+    
+    Extra kwargs depend on provider:
+    - gemini: project_id, location, model
+    - openai: api_key, model
+    - anthropic: api_key, model
     """
-    if provider_name != "gemini":
-        raise ValueError("Only 'gemini' provider is supported in this build")
-
-    return GeminiProvider(
-        project_id=kwargs.get("project_id") or kwargs.get("gcp_project"),
-        location=kwargs.get("location") or kwargs.get("gcp_location"),
-        model=kwargs.get("model") or kwargs.get("gemini_model"),
-    )
+    if provider_name == "gemini":
+        return GeminiProvider(
+            project_id=kwargs.get("project_id") or kwargs.get("gcp_project"),
+            location=kwargs.get("location") or kwargs.get("gcp_location"),
+            model=kwargs.get("model") or kwargs.get("gemini_model"),
+        )
+    elif provider_name == "openai":
+        from .llm_provider_openai import OpenAIProvider
+        return OpenAIProvider(
+            api_key=kwargs.get("api_key") or kwargs.get("openai_api_key"),
+            model=kwargs.get("model") or kwargs.get("openai_model", "gpt-4"),
+        )
+    elif provider_name == "anthropic":
+        from .llm_provider_anthropic import AnthropicProvider
+        return AnthropicProvider(
+            api_key=kwargs.get("api_key") or kwargs.get("anthropic_api_key"),
+            model=kwargs.get("model") or kwargs.get("anthropic_model", "claude-3-opus-20240229"),
+        )
+    else:
+        raise ValueError(f"Unsupported provider: {provider_name}. Supported: gemini, openai, anthropic")
