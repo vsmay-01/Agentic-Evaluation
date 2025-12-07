@@ -40,12 +40,23 @@ class GeminiProvider(LLMProvider):
     the module can be imported even if the dependency is not installed.
     """
 
-    def __init__(self, project_id: str, location: str = "us-central1", model: str = "gemini-1.5-flash"):
+    def __init__(self, project_id: str, location: str = "us-central1", model: str = "gemini-1.5-flash", credentials_path: str = None):
         if not project_id:
             raise ValueError("GCP project id must be provided")
         self.project_id = project_id
         self.location = location
         self.model = model
+        
+        # Set GOOGLE_APPLICATION_CREDENTIALS if credentials path is provided
+        if credentials_path:
+            import os
+            from pathlib import Path
+            creds_path = Path(credentials_path).resolve()
+            if creds_path.exists():
+                os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = str(creds_path)
+                logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to {creds_path}")
+            else:
+                logger.warning(f"Credentials file not found at {creds_path}")
 
     def evaluate_response(self, prompt: str, response: str, reference: str = None) -> Dict[str, Any]:
         reference_text = f"\n\nReference/Expected Answer: {reference}" if reference else ""
@@ -193,6 +204,7 @@ def get_llm_provider(provider_name: str = "gemini", **kwargs) -> LLMProvider:
             project_id=kwargs.get("project_id") or kwargs.get("gcp_project"),
             location=kwargs.get("location") or kwargs.get("gcp_location"),
             model=kwargs.get("model") or kwargs.get("gemini_model"),
+            credentials_path=kwargs.get("credentials_path") or kwargs.get("google_application_credentials"),
         )
     elif provider_name == "openai":
         from .llm_provider_openai import OpenAIProvider
