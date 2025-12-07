@@ -100,15 +100,19 @@ Return JSON with keys: instruction_following, hallucination_prevention, assumpti
             # High-level interface: GenerativeModel / TextGenerationModel depending on SDK
             # Try recommended high-level API if available
             model_obj = None
+            # Build fully-qualified model resource name (works across SDK versions)
+            qualified_model = f"projects/{self.project_id}/locations/{self.location}/models/{self.model}"
+
             if hasattr(aiplatform, "GenerativeModel"):
-                model_obj = aiplatform.GenerativeModel(self.model)
+                model_obj = aiplatform.GenerativeModel(qualified_model)
                 response_obj = model_obj.generate(evaluation_prompt) if hasattr(model_obj, "generate") else model_obj.generate_content(evaluation_prompt)
             elif hasattr(aiplatform, "TextGenerationModel"):
-                model_obj = aiplatform.TextGenerationModel.from_pretrained(self.model)
+                # `from_pretrained` can accept resource names; use fully-qualified name to avoid validation issues
+                model_obj = aiplatform.TextGenerationModel.from_pretrained(qualified_model)
                 response_obj = model_obj.generate(evaluation_prompt)
             else:
                 # Fallback to the generic Model class (older SDKs)
-                model_obj = aiplatform.Model(self.model)
+                model_obj = aiplatform.Model(qualified_model)
                 # Use `predict` or `batch_predict` if available; attempt a gentle call
                 if hasattr(model_obj, "predict"):
                     response_obj = model_obj.predict(evaluation_prompt)
