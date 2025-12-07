@@ -30,16 +30,18 @@ def evaluate(req: EvaluationRequest):
     
     for i, input_item in enumerate(req.inputs):
         prompt = input_item.prompt
-        reference = input_item.reference or ""
+        agent_response = input_item.agent_response
+        reference = input_item.reference  # Optional, used for accuracy comparison
         
         # Rule-based checks (instruction following, coherence, basic accuracy)
-        rule_result = rule_based.apply_rule_checks(prompt, reference)
+        # Evaluate agent_response against the prompt
+        rule_result = rule_based.apply_rule_checks(prompt, agent_response)
         scores[f"input_{i}_rule_score"] = rule_result.get("score", 0.0)
         details[f"input_{i}_rule_issues"] = rule_result.get("issues", [])
         
         # LLM-based evaluation (hallucination, assumption prevention, accuracy)
-        # Now uses real LLM if configured, otherwise heuristics
-        llm_result = llm_judge.judge_with_llm(prompt, reference)
+        # Evaluate agent_response against the prompt, optionally using reference for accuracy
+        llm_result = llm_judge.judge_with_llm(prompt, agent_response, reference=reference)
         scores[f"input_{i}_llm_score"] = llm_result.get("score", 0.0)
         details[f"input_{i}_llm_reason"] = llm_result.get("reason", "")
         
@@ -77,6 +79,14 @@ def evaluate(req: EvaluationRequest):
         "dimension_scores": aggregated_dimensions,
         "individual_scores": scores,
         "details": details,
+        "inputs": [
+            {
+                "prompt": inp.prompt,
+                "agent_response": inp.agent_response,
+                "reference": inp.reference
+            }
+            for inp in req.inputs
+        ]
     }
     save_results.save_result(result_obj)
     

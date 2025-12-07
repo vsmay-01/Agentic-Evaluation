@@ -117,7 +117,7 @@ function BatchUpload() {
           <textarea
             value={jsonData}
             onChange={(e) => setJsonData(e.target.value)}
-            placeholder={`{\n  "id": "batch-001",\n  "model_name": "gpt-4",\n  "inputs": [\n    {\n      "prompt": "...",\n      "reference": "..."\n    }\n  ]\n}`}
+            placeholder={`{\n  "id": "batch-001",\n  "model_name": "gpt-4",\n  "inputs": [\n    {\n      "prompt": "What is AI?",\n      "agent_response": "AI is artificial intelligence...",\n      "reference": "Expected answer (optional)"\n    }\n  ]\n}`}
             rows="15"
             className="json-input"
           />

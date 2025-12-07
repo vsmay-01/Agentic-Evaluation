@@ -19,15 +19,16 @@ batch_status: Dict[str, Dict[str, Any]] = {}
 def evaluate_single_input(request_id: str, model_name: str, input_item: EvaluationInput) -> Dict[str, Any]:
     """Evaluate a single input item."""
     prompt = input_item.prompt
-    reference = input_item.reference or ""
+    agent_response = input_item.agent_response
+    reference = input_item.reference
     
-    # Rule-based checks
-    rule_result = rule_based.apply_rule_checks(prompt, reference)
+    # Rule-based checks - evaluate agent_response against prompt
+    rule_result = rule_based.apply_rule_checks(prompt, agent_response)
     rule_score = rule_result.get("score", 0.0)
     rule_issues = rule_result.get("issues", [])
     
-    # LLM evaluation
-    llm_result = llm_judge.judge_with_llm(prompt, reference)
+    # LLM evaluation - evaluate agent_response, optionally using reference for accuracy
+    llm_result = llm_judge.judge_with_llm(prompt, agent_response, reference=reference)
     llm_score = llm_result.get("score", 0.0)
     llm_reason = llm_result.get("reason", "")
     dim_scores = llm_result.get("dimension_scores", {})
@@ -36,7 +37,7 @@ def evaluate_single_input(request_id: str, model_name: str, input_item: Evaluati
     final_score = score_aggregator.aggregate_scores([rule_score, llm_score])
     
     return {
-        "id": f"{request_id}-{input_item}",
+        "id": f"{request_id}-input-{hash(str(input_item))}",
         "score": final_score,
         "details": {
             "dimension_scores": dim_scores,

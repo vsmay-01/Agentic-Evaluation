@@ -48,11 +48,14 @@ Evaluate a single agent response.
   "inputs": [
     {
       "prompt": "What is machine learning?",
+      "agent_response": "Machine learning is a subset of artificial intelligence that enables systems to learn from data.",
       "reference": "Machine learning is a subset of AI."
     }
   ]
 }
 ```
+
+**Note**: `agent_response` is required - this is the actual response from the agent that will be evaluated. `reference` is optional and used for accuracy comparison.
 
 **Response:**
 ```json
@@ -94,16 +97,20 @@ Submit a batch of evaluations for processing.
   "model_name": "gpt-4",
   "inputs": [
     {
-      "prompt": "Question 1",
-      "reference": "Answer 1"
+      "prompt": "What is AI?",
+      "agent_response": "AI is artificial intelligence...",
+      "reference": "Expected answer (optional)"
     },
     {
-      "prompt": "Question 2",
-      "reference": "Answer 2"
+      "prompt": "What is machine learning?",
+      "agent_response": "Machine learning is...",
+      "reference": "Expected answer (optional)"
     }
   ]
 }
 ```
+
+**Note**: Each input must include `prompt` and `agent_response`. `reference` is optional.
 
 **Response:**
 ```json
@@ -303,7 +310,8 @@ response = requests.post(
         "inputs": [
             {
                 "prompt": "What is AI?",
-                "reference": "AI is artificial intelligence"
+                "agent_response": "AI is artificial intelligence that enables machines to perform tasks requiring human intelligence",
+                "reference": "AI is artificial intelligence"  # Optional
             }
         ]
     }
@@ -321,6 +329,7 @@ curl -X POST http://localhost:8000/evaluate/ \
     "model_name": "gpt-4",
     "inputs": [{
       "prompt": "What is AI?",
+      "agent_response": "AI is artificial intelligence that enables machines to perform tasks requiring human intelligence",
       "reference": "AI is artificial intelligence"
     }]
   }'

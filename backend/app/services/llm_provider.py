@@ -19,8 +19,13 @@ class LLMProvider(ABC):
     """Abstract base for LLM providers."""
 
     @abstractmethod
-    def evaluate_response(self, prompt: str, response: str) -> Dict[str, Any]:
+    def evaluate_response(self, prompt: str, response: str, reference: str = None) -> Dict[str, Any]:
         """Evaluate agent response using LLM.
+
+        Args:
+            prompt: The prompt/instruction given to the agent
+            response: The actual response from the agent
+            reference: Optional reference/expected answer for accuracy comparison
 
         Returns a dict with keys: `score` (0-1), `reason` (str),
         and `dimension_scores` (dict).
@@ -42,7 +47,8 @@ class GeminiProvider(LLMProvider):
         self.location = location
         self.model = model
 
-    def evaluate_response(self, prompt: str, response: str) -> Dict[str, Any]:
+    def evaluate_response(self, prompt: str, response: str, reference: str = None) -> Dict[str, Any]:
+        reference_text = f"\n\nReference/Expected Answer: {reference}" if reference else ""
         evaluation_prompt = f"""
 You are an expert evaluator of agent responses. Evaluate this response on the following five dimensions and return ONLY valid JSON with numeric scores between 0.0 and 1.0:
 
@@ -50,11 +56,11 @@ You are an expert evaluator of agent responses. Evaluate this response on the fo
 2. hallucination_prevention: Are facts accurate or made-up?
 3. assumption_prevention: Are unnecessary assumptions avoided?
 4. coherence: Is it logically structured?
-5. accuracy: Does it answer correctly?
+5. accuracy: Does it answer correctly?{f" Compare with the reference answer if provided." if reference else ""}
 
 Prompt: {prompt}
 
-Response: {response}
+Agent Response: {response}{reference_text}
 
 Return JSON with keys: instruction_following, hallucination_prevention, assumption_prevention, coherence, accuracy, reason
 """

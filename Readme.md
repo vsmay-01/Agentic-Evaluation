@@ -126,10 +126,13 @@ curl -X POST http://localhost:8000/evaluate/ \
     "model_name": "gpt-4",
     "inputs": [{
       "prompt": "What is machine learning?",
+      "agent_response": "Machine learning is a subset of AI that enables systems to learn from data",
       "reference": "Machine learning is a subset of AI"
     }]
   }'
 ```
+
+**Note**: `agent_response` (required) is the actual response from the agent. `reference` (optional) is used for accuracy comparison.
 
 ### Batch Processing (Script)
 

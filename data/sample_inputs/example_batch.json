@@ -3,7 +3,11 @@
     "id": "example-1",
     "model_name": "gpt-example",
     "inputs": [
-      {"prompt": "Summarize the following text...", "reference": "Reference summary here"}
+      {
+        "prompt": "What is machine learning?",
+        "agent_response": "Machine learning is a subset of artificial intelligence that enables systems to learn from data without being explicitly programmed.",
+        "reference": "Machine learning is a method of data analysis that automates analytical model building."
+      }
     ]
   }
 ]

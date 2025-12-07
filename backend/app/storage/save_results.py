@@ -34,9 +34,10 @@ def save_result(result: dict):
                 "details": result.get("details", {}),
             }
             
-            # Extract prompt and reference from inputs if available
+            # Extract prompt, agent_response and reference from inputs if available
             if "inputs" in result and result["inputs"]:
                 eval_data["prompt"] = result["inputs"][0].get("prompt", "")
+                eval_data["agent_response"] = result["inputs"][0].get("agent_response", "")
                 eval_data["reference"] = result["inputs"][0].get("reference", "")
             
             if existing:

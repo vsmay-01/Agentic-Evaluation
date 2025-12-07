@@ -24,6 +24,7 @@ class Evaluation(Base):
     details = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     prompt = Column(Text, nullable=True)
+    agent_response = Column(Text, nullable=True)  # Store agent response
     reference = Column(Text, nullable=True)
 
 

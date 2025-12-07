@@ -9,7 +9,7 @@ from .llm_provider import get_llm_provider
 from typing import Dict, Any
 
 
-def judge_with_llm(prompt: str, response: str) -> Dict[str, Any]:
+def judge_with_llm(prompt: str, response: str, reference: str = None) -> Dict[str, Any]:
     """
     Evaluate agent response using real LLM or heuristics.
     
@@ -24,7 +24,7 @@ def judge_with_llm(prompt: str, response: str) -> Dict[str, Any]:
         dict with 'score' (0-1), 'reason' string, and 'dimension_scores'
     """
     if not settings.use_llm_evaluation:
-        return judge_with_heuristics(prompt, response)
+        return judge_with_heuristics(prompt, response, reference=reference)
     
     try:
         # Build kwargs based on provider
@@ -47,18 +47,18 @@ def judge_with_llm(prompt: str, response: str) -> Dict[str, Any]:
             }
         
         provider = get_llm_provider(settings.llm_provider, **provider_kwargs)
-        result = provider.evaluate_response(prompt, response)
+        result = provider.evaluate_response(prompt, response, reference=reference)
         return result
         
     except Exception as e:
         if settings.use_heuristic_fallback:
             print(f"LLM evaluation failed: {str(e)}. Falling back to heuristics.")
-            return judge_with_heuristics(prompt, response)
+            return judge_with_heuristics(prompt, response, reference=reference)
         else:
             raise
 
 
-def judge_with_heuristics(prompt: str, response: str) -> Dict[str, Any]:
+def judge_with_heuristics(prompt: str, response: str, reference: str = None) -> Dict[str, Any]:
     """
     Fallback: Use heuristics when LLM API is unavailable.
     
@@ -99,6 +99,18 @@ def judge_with_heuristics(prompt: str, response: str) -> Dict[str, Any]:
         score -= 0.1
         dimension_scores["accuracy"] -= 0.15
         reasons.append("Response is brief; may lack detail")
+    
+    # Heuristic 5: Compare with reference if provided (for accuracy)
+    if reference:
+        # Simple similarity check (word overlap)
+        response_words = set(response.lower().split())
+        reference_words = set(reference.lower().split())
+        if reference_words:
+            similarity = len(response_words & reference_words) / len(reference_words)
+            if similarity < 0.3:
+                score -= 0.1
+                dimension_scores["accuracy"] -= 0.15
+                reasons.append(f"Low similarity with reference ({similarity:.1%})")
     
     # Heuristic 4: Confidence language
     hedge_words = ["somewhat", "slightly", "relatively", "quite", "rather"]
