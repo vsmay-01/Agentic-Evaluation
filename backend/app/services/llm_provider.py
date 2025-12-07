@@ -173,17 +173,9 @@ Return JSON with keys: instruction_following, hallucination_prevention, assumpti
 
         except Exception as e:
             logger.exception("Gemini evaluation failed")
-            return {
-                "score": 0.5,
-                "reason": f"Gemini evaluation error: {str(e)}",
-                "dimension_scores": {
-                    "instruction_following": 0.5,
-                    "hallucination_prevention": 0.5,
-                    "assumption_prevention": 0.5,
-                    "coherence": 0.5,
-                    "accuracy": 0.5,
-                },
-            }
+            # Return error that will trigger fallback to heuristics
+            # Don't return a valid result here - let the exception propagate
+            raise Exception(f"Gemini evaluation failed: {str(e)}")
 
 
 def get_llm_provider(provider_name: str = "gemini", **kwargs) -> LLMProvider:

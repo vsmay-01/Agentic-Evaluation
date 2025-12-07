@@ -6,10 +6,9 @@ Supports real LLM (GPT-4, Claude) or heuristic fallback.
 
 from ..core.config import settings
 from .llm_provider import get_llm_provider
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-
-def judge_with_llm(prompt: str, response: str, reference: str = None) -> Dict[str, Any]:
+def judge_with_llm(prompt: str, response: str, reference: Optional[str] = None) -> Dict[str, Any]:
     """
     Evaluate agent response using real LLM or heuristics.
     
@@ -52,7 +51,10 @@ def judge_with_llm(prompt: str, response: str, reference: str = None) -> Dict[st
         
     except Exception as e:
         if settings.use_heuristic_fallback:
-            print(f"LLM evaluation failed: {str(e)}. Falling back to heuristics.")
+            # Log error but don't expose it in response - use heuristics instead
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"LLM evaluation failed: {str(e)}. Falling back to heuristics.")
             return judge_with_heuristics(prompt, response, reference=reference)
         else:
             raise
