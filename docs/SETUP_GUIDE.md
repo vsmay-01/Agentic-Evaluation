@@ -36,11 +36,11 @@ Create a `.env` file in the project root:
 # LLM Provider (gemini, openai, anthropic)
 LLM_PROVIDER=gemini
 
-# Google Cloud / Gemini Configuration
-GCP_PROJECT=your-project-id
-GCP_LOCATION=us-central1
+# AI Studio / Gemini Configuration (API-key method)
+# Recommended: use AI Studio API key and the model REST invoke URL
+AI_STUDIO_API_KEY=your-ai-studio-api-key
+AI_STUDIO_ENDPOINT=https://us-central1-aiplatform.googleapis.com/v1/projects/<PROJECT_ID>/locations/us-central1/models/gemini-1.5-flash:predict
 GEMINI_MODEL=gemini-1.5-flash
-GOOGLE_APPLICATION_CREDENTIALS=path/to/credentials.json
 
 # OpenAI Configuration (optional)
 OPENAI_API_KEY=your-openai-key
@@ -101,15 +101,14 @@ npm start
 
 The frontend will be available at `http://localhost:3000`
 
-## Google Cloud Setup (for Gemini)
+## Google Cloud Setup (for Gemini) (Deprecated)
 
-1. Create a Google Cloud Project
-2. Enable Vertex AI API
-3. Create a service account and download credentials JSON
-4. Set `GOOGLE_APPLICATION_CREDENTIALS` environment variable
-5. Set `GCP_PROJECT` to your project ID
+This section used to describe a service-account / SDK-based integration for Gemini via Google Cloud. The project has moved to an API-key-first workflow using AI Studio (Gemini) REST endpoints.
 
-See `GCP_SETUP_GUIDE.md` for detailed instructions.
+- If you want the API-key / AI Studio method (recommended): follow `README_GEMINI.md` which documents how to obtain an AI Studio API key and configure `AI_STUDIO_API_KEY` and `AI_STUDIO_ENDPOINT` in `.env`.
+- If you still require the old service-account / SDK method, see `GCP_SETUP_GUIDE.md` but be aware it is deprecated and may not match the current codebase which defaults to API-key usage.
+
+Set `LLM_PROVIDER=gemini` and ensure `AI_STUDIO_API_KEY` and `AI_STUDIO_ENDPOINT` are configured in your environment or `.env`.
 
 ## OpenAI Setup (Optional)
 

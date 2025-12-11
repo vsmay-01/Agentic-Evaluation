@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Quick test to verify GCP config is loaded from .env"""
+"""Quick test to verify AI Studio (Gemini) config is loaded from .env"""
 import sys
 import os
 
@@ -26,4 +26,4 @@ if settings.ai_studio_api_key and settings.ai_studio_api_key != "":
     print("  python -m uvicorn app.main:app --reload")
 else:
     print("❌ AI_STUDIO_API_KEY is empty. Did you update .env?")
-    print("   Edit .env and set AI_STUDIO_API_KEY to your AI Studio API key or set ai_studio_endpoint+api_key in config")
+     print("   Edit .env and set AI_STUDIO_API_KEY to your AI Studio API key or set ai_studio_endpoint/api_key in config")
