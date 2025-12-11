@@ -35,12 +35,16 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite:///../../data/evaluations.db"
 
-    # LLM Configuration (Gemini / Vertex AI)
+    # LLM Configuration (Gemini via AI Studio / Vertex REST)
     llm_provider: str = "gemini"
-    gcp_project: str = ""
-    gcp_location: str = "us-central1"
+    # Full AI Studio / Vertex REST endpoint (optional). If not provided, a default constructed URL
+    # will be used when a project/location are available. Example:
+    # https://us-central1-aiplatform.googleapis.com/v1/projects/<project>/locations/us-central1/models/<model>:predict
+    ai_studio_endpoint: str = ""
+    # API key for AI Studio / Vertex REST (preferred for API-key based access)
+    ai_studio_api_key: str = ""
+    # Gemini model id (model name or resource id)
     gemini_model: str = "gemini-1.5-flash"
-    google_application_credentials: str = ""
 
     # Batch processing
     max_batch_size: int = 100

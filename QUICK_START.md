@@ -113,9 +113,11 @@ Create a `.env` file in the project root for LLM configuration:
 # LLM Provider (gemini, openai, anthropic)
 LLM_PROVIDER=gemini
 
-# For Gemini
-GCP_PROJECT=your-project-id
-GCP_LOCATION=us-central1
+# For Gemini via AI Studio (API-key based)
+# Set your AI Studio API key and optionally a full endpoint. If endpoint is empty,
+# the code will attempt to construct a default endpoint when a project/location is available.
+AI_STUDIO_API_KEY=your-ai-studio-api-key
+AI_STUDIO_ENDPOINT=
 GEMINI_MODEL=gemini-1.5-flash
 
 # For OpenAI (optional)

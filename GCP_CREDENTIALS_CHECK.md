@@ -71,3 +71,4 @@ python -c "import os; from pathlib import Path; from google.cloud import aiplatf
 
 Once you create the `.env` file and restart the backend, Gemini should work correctly!
 
+

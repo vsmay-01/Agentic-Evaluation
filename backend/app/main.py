@@ -21,6 +21,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Routers
 app.include_router(health.router, prefix="/health")
 app.include_router(evaluate.router, prefix="/evaluate")
 app.include_router(batch.router, prefix="/api")
@@ -45,4 +46,3 @@ def root():
             "health": "GET /health/ready"
         }
     }
-

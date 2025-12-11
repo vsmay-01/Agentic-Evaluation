@@ -40,23 +40,15 @@ class GeminiProvider(LLMProvider):
     the module can be imported even if the dependency is not installed.
     """
 
-    def __init__(self, project_id: str, location: str = "us-central1", model: str = "gemini-1.5-flash", credentials_path: str = None):
-        if not project_id:
-            raise ValueError("GCP project id must be provided")
+    def __init__(self, project_id: str = None, location: str = "us-central1", model: str = "gemini-1.5-flash", credentials_path: str = None, api_key: str = None, endpoint: str = None):
+        # For API-key based AI Studio use `api_key` and optionally a full `endpoint`.
+        # `project_id` and `location` are optional and only used to construct a default
+        # endpoint if `endpoint` is not provided.
         self.project_id = project_id
         self.location = location
         self.model = model
-        
-        # Set GOOGLE_APPLICATION_CREDENTIALS if credentials path is provided
-        if credentials_path:
-            import os
-            from pathlib import Path
-            creds_path = Path(credentials_path).resolve()
-            if creds_path.exists():
-                os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = str(creds_path)
-                logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to {creds_path}")
-            else:
-                logger.warning(f"Credentials file not found at {creds_path}")
+        self.api_key = api_key
+        self.endpoint = endpoint
 
     def evaluate_response(self, prompt: str, response: str, reference: str = None) -> Dict[str, Any]:
         reference_text = f"\n\nReference/Expected Answer: {reference}" if reference else ""
@@ -76,68 +68,58 @@ Agent Response: {response}{reference_text}
 Return JSON with keys: instruction_following, hallucination_prevention, assumption_prevention, coherence, accuracy, reason
 """
 
-        # Lazy import to avoid hard dependency at import time
-        try:
-            from google.cloud import aiplatform
-        except Exception as e:  # pragma: no cover - external dependency
-            logger.exception("google-cloud-aiplatform is not installed or failed to import")
-            return {
-                "score": 0.5,
-                "reason": f"Vertex AI client unavailable: {str(e)}",
-                "dimension_scores": {
-                    "instruction_following": 0.5,
-                    "hallucination_prevention": 0.5,
-                    "assumption_prevention": 0.5,
-                    "coherence": 0.5,
-                    "accuracy": 0.5,
-                },
-            }
+        # Build the REST endpoint to call. Prefer explicit endpoint; otherwise construct if project_id provided.
+        rest_endpoint = None
+        if self.endpoint and isinstance(self.endpoint, str) and self.endpoint.strip() != "":
+            rest_endpoint = self.endpoint
+        elif self.project_id:
+            rest_endpoint = f"https://{self.location}-aiplatform.googleapis.com/v1/projects/{self.project_id}/locations/{self.location}/models/{self.model}:predict"
 
-        try:
-            # Initialize Vertex AI (no-op if already configured)
-            aiplatform.init(project=self.project_id, location=self.location)
+        # If an API key is provided and we have a REST endpoint, call AI Studio / Vertex REST predict endpoint
+        if self.api_key and rest_endpoint:
+            try:
+                import requests
 
-            # High-level interface: GenerativeModel / TextGenerationModel depending on SDK
-            # Try recommended high-level API if available
-            model_obj = None
-            # Build fully-qualified model resource name (works across SDK versions)
-            qualified_model = f"projects/{self.project_id}/locations/{self.location}/models/{self.model}"
+                params = {"key": self.api_key}
+                payload = {"instances": [{"content": evaluation_prompt}]}
+                headers = {"Content-Type": "application/json"}
 
-            if hasattr(aiplatform, "GenerativeModel"):
-                model_obj = aiplatform.GenerativeModel(qualified_model)
-                response_obj = model_obj.generate(evaluation_prompt) if hasattr(model_obj, "generate") else model_obj.generate_content(evaluation_prompt)
-            elif hasattr(aiplatform, "TextGenerationModel"):
-                # `from_pretrained` can accept resource names; use fully-qualified name to avoid validation issues
-                model_obj = aiplatform.TextGenerationModel.from_pretrained(qualified_model)
-                response_obj = model_obj.generate(evaluation_prompt)
-            else:
-                # Fallback to the generic Model class (older SDKs)
-                model_obj = aiplatform.Model(qualified_model)
-                # Use `predict` or `batch_predict` if available; attempt a gentle call
-                if hasattr(model_obj, "predict"):
-                    response_obj = model_obj.predict(evaluation_prompt)
-                else:
-                    # As last resort, attempt to call the gapic PredictionServiceClient
-                    from google.cloud.aiplatform.gapic import PredictionServiceClient
-                    client = PredictionServiceClient()
-                    endpoint = model_obj.resource_name if hasattr(model_obj, "resource_name") else f"projects/{self.project_id}/locations/{self.location}/models/{self.model}"
-                    response_obj = client.predict(endpoint=endpoint, instances=[{"content": evaluation_prompt}])
+                resp = requests.post(rest_endpoint, params=params, json=payload, headers=headers, timeout=60)
+                resp.raise_for_status()
+                j = resp.json()
 
-            # Extract text from response object in a robust way
-            response_text = None
-            if isinstance(response_obj, dict) and "text" in response_obj:
-                response_text = response_obj["text"]
-            elif hasattr(response_obj, "text"):
-                response_text = getattr(response_obj, "text")
-            elif hasattr(response_obj, "generations"):
-                # Some SDKs return generations -> list -> text
-                gens = getattr(response_obj, "generations")
-                if gens and isinstance(gens, list) and hasattr(gens[0], "text"):
-                    response_text = gens[0].text
-                elif isinstance(gens, list) and isinstance(gens[0], dict) and "text" in gens[0]:
-                    response_text = gens[0]["text"]
-            else:
-                response_text = str(response_obj)
+                # Try to extract text from common response shapes
+                response_text = None
+                if isinstance(j, dict):
+                    if "predictions" in j and isinstance(j["predictions"], list) and j["predictions"]:
+                        first = j["predictions"][0]
+                        if isinstance(first, dict):
+                            for key in ("content", "text", "output", "generated_text", "completion"):
+                                if key in first:
+                                    response_text = first[key]
+                                    break
+                        elif isinstance(first, str):
+                            response_text = first
+
+                    if response_text is None:
+                        for candidate_key in ("candidates", "outputs", "response", "data"):
+                            if candidate_key in j:
+                                val = j[candidate_key]
+                                if isinstance(val, list) and val:
+                                    item = val[0]
+                                    if isinstance(item, dict) and "content" in item:
+                                        response_text = item["content"]
+                                        break
+                                    elif isinstance(item, str):
+                                        response_text = item
+                                        break
+
+                if response_text is None:
+                    response_text = json.dumps(j)
+
+            except Exception as e:
+                logger.exception("REST-based Gemini/Vertex call failed")
+                raise Exception(f"Gemini evaluation (REST) failed: {str(e)}")
 
             # Clean up common markdown wrappers
             if response_text is None:
@@ -146,7 +128,6 @@ Return JSON with keys: instruction_following, hallucination_prevention, assumpti
             if "```json" in response_text:
                 response_text = response_text.split("```json", 1)[1].split("```", 1)[0].strip()
             elif response_text.strip().startswith("```"):
-                # remove triple-backticks
                 parts = response_text.split("```")
                 if len(parts) >= 2:
                     response_text = parts[1].strip()
@@ -155,7 +136,6 @@ Return JSON with keys: instruction_following, hallucination_prevention, assumpti
             try:
                 result = json.loads(response_text)
             except Exception:
-                # If response is not strict JSON, attempt to extract JSON substring
                 import re
 
                 m = re.search(r"\{[\s\S]*\}", response_text)
@@ -164,7 +144,7 @@ Return JSON with keys: instruction_following, hallucination_prevention, assumpti
                 else:
                     raise
 
-            # Normalize and compute overall score
+            # Normalize and compute overall score (same as SDK path)
             dims = [
                 float(result.get("instruction_following", 0.5)),
                 float(result.get("hallucination_prevention", 0.5)),
@@ -176,7 +156,7 @@ Return JSON with keys: instruction_following, hallucination_prevention, assumpti
 
             return {
                 "score": max(0.0, min(1.0, overall)),
-                "reason": result.get("reason", "Evaluated by Gemini"),
+                "reason": result.get("reason", "Evaluated by Gemini (REST)"),
                 "dimension_scores": {
                     "instruction_following": dims[0],
                     "hallucination_prevention": dims[1],
@@ -186,11 +166,13 @@ Return JSON with keys: instruction_following, hallucination_prevention, assumpti
                 },
             }
 
-        except Exception as e:
-            logger.exception("Gemini evaluation failed")
-            # Return error that will trigger fallback to heuristics
-            # Don't return a valid result here - let the exception propagate
-            raise Exception(f"Gemini evaluation failed: {str(e)}")
+        # SDK-based path removed. This provider is now REST-first and expects an AI Studio
+        # API key + endpoint (or a project_id that can be used to construct a default endpoint).
+        # If you need SDK behavior, re-install `google-cloud-aiplatform` and re-add SDK support.
+        raise Exception(
+            "GeminiProvider: only AI Studio / Vertex REST (API key + endpoint) is supported in this deployment. "
+            "Provide `api_key` and `endpoint` when creating the provider (or set `ai_studio_api_key` and `ai_studio_endpoint` in config)."
+        )
 
 
 def get_llm_provider(provider_name: str = "gemini", **kwargs) -> LLMProvider:
@@ -205,10 +187,12 @@ def get_llm_provider(provider_name: str = "gemini", **kwargs) -> LLMProvider:
     """
     if provider_name == "gemini":
         return GeminiProvider(
-            project_id=kwargs.get("project_id") or kwargs.get("gcp_project"),
-            location=kwargs.get("location") or kwargs.get("gcp_location"),
+            project_id=kwargs.get("project_id"),
+            location=kwargs.get("location"),
             model=kwargs.get("model") or kwargs.get("gemini_model"),
-            credentials_path=kwargs.get("credentials_path") or kwargs.get("google_application_credentials"),
+            credentials_path=kwargs.get("credentials_path"),
+            api_key=kwargs.get("api_key") or kwargs.get("ai_studio_api_key"),
+            endpoint=kwargs.get("endpoint") or kwargs.get("ai_studio_endpoint"),
         )
     elif provider_name == "openai":
         from .llm_provider_openai import OpenAIProvider

@@ -30,10 +30,9 @@ def judge_with_llm(prompt: str, response: str, reference: Optional[str] = None) 
         provider_kwargs = {}
         if settings.llm_provider == "gemini":
             provider_kwargs = {
-                "gcp_project": settings.gcp_project,
-                "gcp_location": settings.gcp_location,
-                "gemini_model": settings.gemini_model,
-                "credentials_path": settings.google_application_credentials if settings.google_application_credentials else None,
+                "model": settings.gemini_model,
+                "api_key": settings.ai_studio_api_key,
+                "endpoint": settings.ai_studio_endpoint,
             }
         elif settings.llm_provider == "openai":
             provider_kwargs = {
